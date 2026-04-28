@@ -10,9 +10,11 @@ from threading import Thread
 def create_socket(host, port):
     # 1. Create a socket.
     ## soc = ...
+    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     # 2. Try connecting the socket to the host and port.
     try:
         ## ...
+        soc.bind((host, port))
     except:
         print("Connection Error to", port)
         sys.exit()
@@ -30,12 +32,16 @@ def read_csv(path):
     table_list = []
     # 4. For each line in the file:
     ## for ...:
+    for line in table:
         # 5. split it by the delimiter,
         ## ...
+        line = line.split(",")
         # 6. remove any leading or trailing spaces in each element, and
         ## ...
+        line = [el.strip() for el in line]
         # 7. append the resulting list to table_list.
         ## table_list.append(...)
+        table_list.append(line)
     # 8. Close the file and return table_list.
     table_file.close()
     return table_list
@@ -46,10 +52,13 @@ def read_csv(path):
 def find_default_gateway(table):
     # 1. Traverse the table, row by row,
     ## for ...:
+    for row in table:
         # 2. and if the network destination of that row matches 0.0.0.0,
         ## if ...:
+        if row[0] == "0.0.0.0":
             # 3. then return the interface of that row.
             ## return ...
+            return row[3]
 
 
 # The purpose of this function is to generate a forwarding table that includes the IP range for a given interface.
@@ -60,21 +69,34 @@ def generate_forwarding_table_with_range(table):
     new_table = []
     # 2. Traverse the old forwarding table, row by row,
     ## for ...:
+    for row in table:
         # 3. and process each network destination other than 0.0.0.0
         # (0.0.0.0 is only useful for finding the default port).
         ## if ...:
+        if row[0] != "0.0.0.0":
             # 4. Store the network destination and netmask.
             ## network_dst_string = ...
+            network_dst_string = row[0]
             ## netmask_string = ...
+            netmask_string = row[1]
             # 5. Convert both strings into their binary representations.
             ## network_dst_bin = ...
+            network_dst_bin = ip_to_bin(network_dst_string)
             ## netmask_bin = ...
+            netmask_bin = ip_to_bin(netmask_string)
             # 6. Find the IP range.
             ## ip_range = ...
             # 7. Build the new row.
             ## new_row = ...
+            new_row = [
+                int(network_dst_bin, 2) & int(netmask_bin, 2),
+                int(netmask_bin, 2),
+                row[2],
+                row[3]
+            ]
             # 8. Append the new row to new_table.
             ## new_table.append(new_row)
+            new_table.append(new_row)
     # 9. Return new_table.
     return new_table
 
@@ -83,25 +105,36 @@ def generate_forwarding_table_with_range(table):
 def ip_to_bin(ip):
     # 1. Split the IP into octets.
     ## ip_octets = ...
+    ip_octets = ip.split(".", 4)
     # 2. Create an empty string to store each binary octet.
     ip_bin_string = ""
     # 3. Traverse the IP, octet by octet,
     ## for ...:
+    for octet in ip_octets:
         # 4. and convert the octet to an int,
         ## int_octet = ...
+        int_octet = int(octet)
         # 5. convert the decimal int to binary,
         ## bin_octet = ...
+        bin_octet = bin(int_octet)
         # 6. convert the binary to string and remove the "0b" at the beginning of the string,
         ## bin_octet_string = ...
+        bin_octet_string = str(bin_octet)[2:]
         # 7. while the sting representation of the binary is not 8 chars long,
         # then add 0s to the beginning of the string until it is 8 chars long
         # (needs to be an octet because we're working with IP addresses).
         ## while ...:
             ## bin_octet_string = ...
+        if len(bin_octet_string) > 8:
+            print("ERROR! bin string too long:", bin_octet_string)
+            sys.exit()
+        bin_octet_string = "0" * (8 - len(bin_octet_string)) + bin_octet_string
         # 8. Finally, append the octet to ip_bin_string.
         ## ip_bin_string = ...
+        ip_bin_string += bin_octet_string
     # 9. Once the entire string version of the binary IP is created, convert it into an actual binary int.
     ## ip_int = ...
+    ip_int = int(ip_bin_string, 2)
     # 10. Return the binary representation of this int.
     return bin(ip_int)
 
@@ -133,27 +166,32 @@ def bit_not(n, numbits=32):
 def receive_packet(connection, max_buffer_size):
     # 1. Receive the packet from the socket.
     ## received_packet = ...
+    received_packet = connection.recv(max_buffer_size)
     # 2. If the packet size is larger than the max_buffer_size, print a debugging message
     packet_size = sys.getsizeof(received_packet)
     if packet_size > max_buffer_size:
         print("The packet size is greater than expected", packet_size)
     # 3. Decode the packet and strip any trailing whitespace.
     ## decoded_packet = ...
-    # 3. Append the packet to received_by_router_2.txt.
+    decoded_packet = received_packet.decode('utf-8').strip()
+    # 3. Append the packet to received_by_router_5.txt.
     print("received packet", decoded_packet)
+    write_to_file("output\\received_by_router_5.txt", decoded_packet)
     ## ...
     # 4. Split the packet by the delimiter.
     ## packet = ...
+    packet = decoded_packet.split(",")
     # 5. Return the list representation of the packet.
     return packet
 
 
 # The purpose of this function is to write packets/payload to file.
-def write_to_file(path, packet_to_write, send_to_router=None):
+def write_to_file(path, packet_to_write, send_to_router=None):                                                                                                                                                                                                         
     # 1. Open the output file for appending.
     out_file = open(path, "a")
     # 2. If this router is not sending, then just append the packet to the output file.
     ## if ...:
+    if True:
         out_file.write(packet_to_write + "\n")
     # 3. Else if this router is sending, then append the intended recipient, along with the packet, to the output file.
     else:
@@ -170,36 +208,49 @@ def write_to_file(path, packet_to_write, send_to_router=None):
 def start_server():
     # 1. Create a socket.
     ## host = ...
+    host = "127.0.0.1"
     ## port = ...
+    port = 8005
     ## soc = ...
+    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     print("Socket created")
     # 2. Try binding the socket to the appropriate host and receiving port (based on the network topology diagram).
     try:
         ## ...
+        soc.bind((host, port))
     except:
         print("Bind failed. Error : " + str(sys.exc_info()))
         sys.exit()
     # 3. Set the socket to listen.
     ## ...
+    soc.listen()
     print("Socket now listening")
 
     # 4. Read in and store the forwarding table.
     ## forwarding_table = ...
+    forwarding_table = read_csv("input\\router_5_table.csv")
     # 5. Store the default gateway port.
     ## default_gateway_port = ...
+    default_gateway_port = find_default_gateway(forwarding_table)
     # 6. Generate a new forwarding table that includes the IP ranges for matching against destination IPS.
     ## forwarding_table_with_range = ...
+    forwarding_table = generate_forwarding_table_with_range(forwarding_table)
 
     # 7. Continuously process incoming packets.
     while True:
         # 8. Accept the connection.
         ## connection, address = ...
+        conn, addr = soc.accept()
         ## ip, port = ...
-        print("Connected with " + ip + ":" + port)
+        ip, port = addr
+        print("Connected with " + ip + ":" + str(port))
         # 9. Start a new thread for receiving and processing the incoming packets.
         try:
             ## ...
+            print("supposed to launch a thread here!")
+            t = Thread(target=processing_thread, args=(conn, ip, port, forwarding_table, default_gateway_port))
+            t.start()
         except:
             print("Thread did not start.")
             traceback.print_exc()
@@ -209,7 +260,7 @@ def start_server():
 def processing_thread(connection, ip, port, forwarding_table_with_range, default_gateway_port, max_buffer_size=5120):
     # 1. Connect to the appropriate sending ports (based on the network topology diagram).
     ## ...
-
+    print("Thread launched!")
     # 2. Continuously process incoming packets
     while True:
         # 3. Receive the incoming packet, process it, and store its list representation
@@ -240,9 +291,9 @@ def processing_thread(connection, ip, port, forwarding_table_with_range, default
         ## ...
 
         # 11. Either
-        # (a) send the new packet to the appropriate port (and append it to sent_by_router_2.txt),
-        # (b) append the payload to out_router_2.txt without forwarding because this router is the last hop, or
-        # (c) append the new packet to discarded_by_router_2.txt and do not forward the new packet
+        # (a) send the new packet to the appropriate port (and append it to sent_by_router_5.txt),
+        # (b) append the payload to out_router_5.txt without forwarding because this router is the last hop, or
+        # (c) append the new packet to discarded_by_router_5.txt and do not forward the new packet
         ## if ...:
             print("sending packet", new_packet, "to Router 3")
             ## ...
@@ -252,7 +303,7 @@ def processing_thread(connection, ip, port, forwarding_table_with_range, default
         ## elif ...:
             print("OUT:", payload)
             ## ...
-        else:
+        #else:
             print("DISCARD:", new_packet)
             ## ...
 
@@ -260,4 +311,48 @@ def processing_thread(connection, ip, port, forwarding_table_with_range, default
 # Main Program
 
 # 1. Start the server.
-start_server()
+host = "127.0.0.1"
+port = 8005
+soc = create_socket(host, port)
+soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+print("Socket created")
+soc.listen()
+print("Socket now listening")
+
+connection, addr = soc.accept()
+ip, port = addr
+print("Connected with " + ip + ":" + str(port))
+
+max_buffer_size = 5120
+
+# 2. Read in and store the forwarding table.
+## forwarding_table = ...
+forwarding_table = read_csv("input\\router_5_table.csv")
+# 3. Store the default gateway port.
+## default_gateway_port = ...
+default_gateway_port = find_default_gateway(forwarding_table)
+# 4. Generate a new forwarding table that includes the IP ranges for matching against destination IPS.
+## forwarding_table_with_range = ...
+forwarding_table = generate_forwarding_table_with_range(forwarding_table)
+
+while True:
+    packet = receive_packet(connection, max_buffer_size)
+    
+    if packet is None:
+        break
+    if len(packet) != 4:
+        print("weird packet:", len(packet), ",".join(packet))
+        break
+
+    destinationIP = packet[1]
+    payload = packet[2]
+    
+    destinationIP_bin = ip_to_bin(destinationIP)
+    destinationIP_int = int(destinationIP_bin, 2)
+    sending_port = next((row[3] for row in forwarding_table if (destinationIP_int & row[1]) == row[0]), None)
+    if sending_port is None:
+        sending_port = default_gateway_port
+    
+    if sending_port == "127.0.0.1":
+        print("OUT:", payload)
+        write_to_file("output\\out_router_5.txt", payload)
